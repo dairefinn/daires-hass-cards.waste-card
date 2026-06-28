@@ -1,0 +1,145 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Waste Card Demo</title>
+  <style>
+    body {
+      background: #f0f4f8;
+      font-family: sans-serif;
+      display: flex;
+      flex-wrap: wrap;
+      gap: 24px;
+      padding: 32px;
+      justify-content: center;
+    }
+    h1 { width: 100%; text-align: center; color: #333; margin-bottom: 0; }
+    h2 {
+      width: 100%;
+      font-size: 13px;
+      font-weight: 500;
+      color: #888;
+      text-transform: uppercase;
+      letter-spacing: 0.08em;
+      margin: 8px 0 0;
+    }
+    p.sub { width: 100%; text-align: center; color: #666; margin-top: 4px; }
+    daires-hass-cards-waste-card { width: 340px; }
+  </style>
+</head>
+<body>
+  <h1>Waste Card Demo</h1>
+  <p class="sub">Static previews — no Home Assistant required</p>
+
+  <h2>Typical week</h2>
+  <daires-hass-cards-waste-card id="typical"></daires-hass-cards-waste-card>
+
+  <h2>Urgent — collection today &amp; tomorrow</h2>
+  <daires-hass-cards-waste-card id="urgent"></daires-hass-cards-waste-card>
+
+  <h2>All bins on the same day</h2>
+  <daires-hass-cards-waste-card id="same-day"></daires-hass-cards-waste-card>
+
+  <h2>No title</h2>
+  <daires-hass-cards-waste-card id="no-title"></daires-hass-cards-waste-card>
+
+  <h2>Single bin</h2>
+  <daires-hass-cards-waste-card id="single"></daires-hass-cards-waste-card>
+
+  <script>
+    if (!customElements.get("ha-card")) {
+      customElements.define("ha-card", class extends HTMLElement {
+        connectedCallback() {
+          this.style.cssText = "display:block;border-radius:12px;box-shadow:0 2px 8px rgba(0,0,0,.15);overflow:hidden;";
+        }
+      });
+    }
+
+    if (!customElements.get("ha-icon")) {
+      customElements.define("ha-icon", class extends HTMLElement {
+        static get observedAttributes() { return ["icon"]; }
+        attributeChangedCallback() { this._render(); }
+        connectedCallback() { this._render(); }
+        _render() {
+          const map = {
+            "mdi:trash-can": "🗑️",
+            "mdi:leaf": "🍃",
+            "mdi:recycle": "♻️",
+            "mdi:trash-can-outline": "🗑️",
+          };
+          const icon = this.getAttribute("icon") ?? "";
+          this.textContent = map[icon] ?? "📦";
+          Object.assign(this.style, {
+            fontSize: "20px",
+            display: "flex",
+            alignItems: "center",
+            justifyContent: "center",
+            lineHeight: "1",
+          });
+        }
+      });
+    }
+  </script>
+  <script src="waste-card.js"></script>
+  <script>
+    function isoDate(daysFromNow) {
+      const d = new Date();
+      d.setHours(0, 0, 0, 0);
+      d.setDate(d.getDate() + daysFromNow);
+      return d.toISOString().split("T")[0];
+    }
+
+    function mockHass(binDays) {
+      // binDays: { entityId: daysUntilNext }
+      const states = {};
+      for (const [entityId, days] of Object.entries(binDays)) {
+        const next = isoDate(days);
+        const after = isoDate(days + 14);
+        states[entityId] = {
+          state: `mock`,
+          attributes: { [next]: "Bin", [after]: "Bin", attribution: "demo" },
+        };
+      }
+      return { states };
+    }
+
+    const BASE_CONFIG = {
+      title: "Waste Collection",
+      bins: [
+        { entity: "brown", name: "Brown", color: "#795548", icon: "mdi:leaf" },
+        { entity: "black", name: "Black", color: "#616161", icon: "mdi:trash-can" },
+        { entity: "green", name: "Green", color: "#43a047", icon: "mdi:recycle" },
+      ],
+    };
+
+    // ── Typical week ──────────────────────────────────────────────────────────
+    const typical = document.getElementById("typical");
+    typical.hass = mockHass({ brown: 8, black: 12, green: 12 });
+    typical.setConfig({ ...BASE_CONFIG });
+
+    // ── Urgent ────────────────────────────────────────────────────────────────
+    const urgent = document.getElementById("urgent");
+    urgent.hass = mockHass({ brown: 0, black: 1, green: 5 });
+    urgent.setConfig({ ...BASE_CONFIG, title: "Waste Collection" });
+
+    // ── All same day ──────────────────────────────────────────────────────────
+    const sameDay = document.getElementById("same-day");
+    sameDay.hass = mockHass({ brown: 3, black: 3, green: 3 });
+    sameDay.setConfig({ ...BASE_CONFIG });
+
+    // ── No title ──────────────────────────────────────────────────────────────
+    const noTitle = document.getElementById("no-title");
+    noTitle.hass = mockHass({ brown: 8, black: 12, green: 12 });
+    noTitle.setConfig({ ...BASE_CONFIG, title: undefined });
+
+    // ── Single bin ────────────────────────────────────────────────────────────
+    const single = document.getElementById("single");
+    single.hass = mockHass({ green: 6 });
+    single.setConfig({
+      title: "Recycling",
+      bins: [{ entity: "green", name: "Green Bin", color: "#43a047", icon: "mdi:recycle" }],
+    });
+  </script>
+</body>
+</html>
