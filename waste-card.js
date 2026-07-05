@@ -21,6 +21,10 @@ class WasteCard extends HTMLElement {
     return 2;
   }
 
+  static getConfigElement() {
+    return document.createElement("daires-hass-cards-waste-card-editor");
+  }
+
   static getStubConfig() {
     return {
       title: "Waste Collection",
@@ -162,3 +166,137 @@ class WasteCard extends HTMLElement {
 }
 
 customElements.define("daires-hass-cards-waste-card", WasteCard);
+
+class WasteCardEditor extends HTMLElement {
+  constructor() {
+    super();
+    this.attachShadow({ mode: "open" });
+  }
+
+  set hass(hass) {
+    this._hass = hass;
+    this.shadowRoot.querySelectorAll("ha-entity-picker").forEach(p => { p.hass = hass; });
+  }
+
+  setConfig(config) {
+    this._config = { ...config, bins: (config.bins ?? []).map(b => ({ ...b })) };
+    this._render();
+  }
+
+  _fire() {
+    this.dispatchEvent(new CustomEvent("config-changed", {
+      detail: { config: { ...this._config, bins: this._config.bins.map(b => ({ ...b })) } },
+      bubbles: true,
+      composed: true,
+    }));
+  }
+
+  _setTop(key, value) {
+    if (value === "" || value === undefined) {
+      delete this._config[key];
+    } else {
+      this._config[key] = value;
+    }
+    this._fire();
+  }
+
+  _setBin(index, key, value) {
+    const bin = { ...this._config.bins[index] };
+    if (value === "" || value === undefined) {
+      delete bin[key];
+    } else {
+      bin[key] = value;
+    }
+    this._config.bins = this._config.bins.map((b, i) => i === index ? bin : b);
+    this._fire();
+  }
+
+  _addBin() {
+    this._config.bins = [...this._config.bins, { entity: "", name: "Bin", color: "#607d8b", icon: "mdi:trash-can" }];
+    this._fire();
+  }
+
+  _removeBin(index) {
+    this._config.bins = this._config.bins.filter((_, i) => i !== index);
+    this._fire();
+  }
+
+  _render() {
+    const c = this._config ?? {};
+    const bins = c.bins ?? [];
+
+    this.shadowRoot.innerHTML = `
+      <style>
+        .form { display: flex; flex-direction: column; gap: 12px; padding: 16px 0; }
+        .section { font-size: 11px; font-weight: 600; letter-spacing: 0.08em; text-transform: uppercase; color: var(--secondary-text-color, #727272); padding-bottom: 4px; border-bottom: 1px solid var(--divider-color, #e0e0e0); margin-top: 8px; }
+        .row { display: flex; flex-direction: column; gap: 4px; }
+        .row-3 { display: grid; grid-template-columns: 1fr 1fr 1fr; gap: 12px; }
+        label { font-size: 12px; color: var(--secondary-text-color, #727272); }
+        input[type=text] { padding: 8px 10px; border: 1px solid var(--divider-color, #e0e0e0); border-radius: 6px; font-size: 14px; color: var(--primary-text-color, #212121); background: var(--card-background-color, #fff); box-sizing: border-box; width: 100%; }
+        ha-entity-picker { display: block; }
+        .bin-block { border: 1px solid var(--divider-color, #e0e0e0); border-radius: 8px; padding: 12px; display: flex; flex-direction: column; gap: 10px; }
+        .bin-header { display: flex; justify-content: space-between; align-items: center; }
+        .bin-label { font-size: 12px; font-weight: 600; color: var(--secondary-text-color, #727272); }
+        .btn-remove { background: none; border: none; cursor: pointer; color: var(--error-color, #db4437); font-size: 18px; line-height: 1; padding: 2px 6px; border-radius: 4px; }
+        .btn-remove:hover { background: color-mix(in srgb, var(--error-color, #db4437) 10%, transparent); }
+        .btn-add { margin-top: 4px; padding: 8px 14px; border: 1px dashed var(--primary-color, #03a9f4); border-radius: 8px; background: none; color: var(--primary-color, #03a9f4); font-size: 13px; cursor: pointer; width: 100%; }
+        .btn-add:hover { background: color-mix(in srgb, var(--primary-color, #03a9f4) 8%, transparent); }
+      </style>
+      <div class="form">
+        <div class="section">General</div>
+        <div class="row">
+          <label>Title</label>
+          <input id="title" type="text" placeholder="Waste Collection" value="${c.title ?? ""}" />
+        </div>
+
+        <div class="section">Bins</div>
+        ${bins.map((bin, i) => `
+          <div class="bin-block">
+            <div class="bin-header">
+              <span class="bin-label">Bin ${i + 1}</span>
+              <button class="btn-remove" data-remove="${i}" title="Remove">✕</button>
+            </div>
+            <div class="row">
+              <label>Entity</label>
+              <ha-entity-picker allow-custom-entity></ha-entity-picker>
+            </div>
+            <div class="row-3">
+              <div class="row"><label>Name</label><input class="bin-name" type="text" placeholder="Bin" value="${bin.name ?? ""}" /></div>
+              <div class="row"><label>Color</label><input class="bin-color" type="text" placeholder="var(--primary-color)" value="${bin.color ?? ""}" /></div>
+              <div class="row"><label>Icon</label><input class="bin-icon" type="text" placeholder="mdi:trash-can" value="${bin.icon ?? ""}" /></div>
+            </div>
+          </div>
+        `).join("")}
+        <button class="btn-add" id="add-bin">+ Add Bin</button>
+      </div>
+    `;
+
+    this.shadowRoot.getElementById("title")
+      .addEventListener("change", e => this._setTop("title", e.target.value));
+
+    this.shadowRoot.getElementById("add-bin")
+      .addEventListener("click", () => this._addBin());
+
+    this.shadowRoot.querySelectorAll(".btn-remove").forEach(btn => {
+      btn.addEventListener("click", e => this._removeBin(parseInt(e.currentTarget.dataset.remove, 10)));
+    });
+
+    this.shadowRoot.querySelectorAll("ha-entity-picker").forEach((picker, i) => {
+      picker.value = bins[i]?.entity ?? "";
+      if (this._hass) picker.hass = this._hass;
+      picker.addEventListener("value-changed", e => this._setBin(i, "entity", e.detail.value));
+    });
+
+    this.shadowRoot.querySelectorAll(".bin-name").forEach((el, i) => {
+      el.addEventListener("change", e => this._setBin(i, "name", e.target.value));
+    });
+    this.shadowRoot.querySelectorAll(".bin-color").forEach((el, i) => {
+      el.addEventListener("change", e => this._setBin(i, "color", e.target.value));
+    });
+    this.shadowRoot.querySelectorAll(".bin-icon").forEach((el, i) => {
+      el.addEventListener("change", e => this._setBin(i, "icon", e.target.value));
+    });
+  }
+}
+
+customElements.define("daires-hass-cards-waste-card-editor", WasteCardEditor);
