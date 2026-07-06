@@ -2,7 +2,7 @@
 
 A waste collection card for Home Assistant. Shows upcoming bin collection dates for multiple bins, highlights the next bin due in its own colour, and displays a countdown label (Today / Tomorrow / N days).
 
-<img width="550" height="1113" alt="image" src="https://github.com/user-attachments/assets/d82b2448-ddc1-4b65-bbff-7e9b04e30a46" />
+<img width="100%" alt="image" src="https://github.com/user-attachments/assets/97667d8b-a035-47e2-84f9-e53ae294632c" />
 
 ## Installation
 
